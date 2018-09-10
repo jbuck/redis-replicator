@@ -19,6 +19,17 @@ const argv = require("yargs")
 const redis = require("redis");
 const util = require("util");
 
+const commandsToRun = [
+  "del",
+  "expire",
+  "hmset",
+  "hset"
+];
+
+commandsToRun.forEach((fnName) => {
+  let rcp = redis.RedisClient.prototype;
+  rcp[fnName + "Async"] = util.promisify(rcp[fnName]);
+});
 ["dump", "restore", "scan"].forEach((fnName) => {
   let rcp = redis.RedisClient.prototype;
   rcp[fnName + "Async"] = util.promisify(rcp[fnName]);
@@ -28,38 +39,50 @@ const util = require("util");
   rmp[fnName + "Async"] = util.promisify(rmp[fnName]);
 });
 
-const allowedCommands = [
-  "APPEND", // key value
-  "BITFIELD", // key [GET type offset] [SET type offset value] [INCRBY type offset increment] [OVERFLOW WRAP|SAT|FAIL]
-  "", //
-]
+const log = (msg) => {
+  console.log(`${(new Date()).toISOString()} - ${msg}`)
+}
 
 const main = async () => {
   const redis_options = { detect_buffers: true };
   let source_client = redis.createClient(argv.source, redis_options);
   let target_client = redis.createClient(argv.destination, redis_options);
 
+  source_client.on("monitor", async (time, args) => {
+    let command = args[0];
+    let commandArgs = args.slice(1);
+
+    if (commandsToRun.includes(command)) {
+      log(`monitor recieved - ${args}`);
+      let result = await target_client[command + "Async"](commandArgs);
+      log(`monitor applied  - ${result}`);
+    } else {
+      log(`monitor ignored  - ${args}`);
+    }
+  });
+
+  source_client.monitor();
+
   let iterator = 0;
 
   do {
+    log(`scan start - iterator ${iterator}`);
     let scan_result = await source_client.scanAsync(iterator);
     iterator = scan_result[0];
-    console.log(scan_result)
+    log(`scan keys  - ${scan_result[1]}`);
 
     for (let key of scan_result[1]) {
       let multi_result = await source_client.multi().dump(new Buffer(key)).pttl(key).execAsync();
       let object = multi_result[0];
-
       let expiry = multi_result[1] >= 0 ? multi_result[1] : 0;
-      console.log(multi_result)
+      log(`fetched - key ${key}`);
 
       let restore_result = await target_client.restoreAsync(key, expiry, object, 'REPLACE');
-      console.log(restore_result)
+      log(`restore complete - ${restore_result.toString()}`);
     }
   } while (iterator != 0)
 
-  source_client.quit()
-  target_client.quit()
+  log(`initial sync complete, Ctrl-C to stop monitor sync`);
 };
 
 main()
