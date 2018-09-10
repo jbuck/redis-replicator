@@ -46,7 +46,7 @@ const log = (msg) => {
 const main = async () => {
   const redis_options = { detect_buffers: true };
   let source_client = redis.createClient(argv.source, redis_options);
-  let target_client = redis.createClient(argv.destination, redis_options);
+  let destination_client = redis.createClient(argv.destination, redis_options);
 
   source_client.on("monitor", async (time, args) => {
     let command = args[0];
@@ -54,7 +54,7 @@ const main = async () => {
 
     if (commandsToRun.includes(command)) {
       log(`monitor recieved - ${args}`);
-      let result = await target_client[command + "Async"](commandArgs);
+      let result = await destination_client[command + "Async"](commandArgs);
       log(`monitor applied  - ${result}`);
     } else {
       log(`monitor ignored  - ${args}`);
@@ -77,7 +77,7 @@ const main = async () => {
       let expiry = multi_result[1] >= 0 ? multi_result[1] : 0;
       log(`fetched - key ${key}`);
 
-      let restore_result = await target_client.restoreAsync(key, expiry, object, 'REPLACE');
+      let restore_result = await destination_client.restoreAsync(key, expiry, object, 'REPLACE');
       log(`restore complete - ${restore_result.toString()}`);
     }
   } while (iterator != 0)
