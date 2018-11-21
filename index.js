@@ -12,6 +12,11 @@ const argv = require("yargs")
       alias: "d",
       demandOption: true,
       describe: "Send data to this Redis instance"
+    },
+    "replication-strategy": {
+      alias: "r",
+      demandOption: true,
+      describe: "Use MONITOR, keyspace notifications, or none to continuously replicate changes"
     }
   })
   .demandCommand(1, "You must specify a command")
@@ -53,7 +58,13 @@ const main = async () => {
   let source_client = redis.createClient(argv.source, redis_options);
   let destination_client = redis.createClient(argv.destination, redis_options);
 
-  start_monitor_sync();
+  if (argv["replication-strategy"] == "monitor") {
+    start_monitor_sync();
+  } else if (argv["replication-strategy"] == "notifications") {
+    start_notification_sync();
+  } else if (argv["replication-strategy"] == "none") {
+    log("Not continuously syncing changes")
+  }
 
   // Redis scan iterators start at 0, and end when it returns 0
   let iterator = 0;
@@ -77,7 +88,11 @@ const main = async () => {
     }
   } while (iterator != 0)
 
-  log(`initial sync complete, Ctrl-C to stop continuous sync`);
+  if (argv["replication-strategy"] != "none") {
+    log(`initial sync complete, Ctrl-C to stop continuous sync`);
+  } else {
+    log(`one-time sync complete`);
+  }
 };
 
 const start_monitor_sync = async (source_client, destination_client) => {
@@ -96,6 +111,16 @@ const start_monitor_sync = async (source_client, destination_client) => {
 
   source_client.monitor();
 };
+
+const start_notification_sync = async (source_client, destination_client) => {
+  // Listen for changes to the source redis via keyspace notifications
+  // https://redis.io/topics/notifications
+  source_client.on("pmessage", async (pattern, channel, message) => {
+    console.log(`${pattern},${channel},${message}`);
+  })
+
+  source_client.psubscribe("__keyevent@0__:*")
+}
 
 main()
 
