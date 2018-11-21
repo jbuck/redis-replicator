@@ -55,13 +55,14 @@ const log = (msg) => {
 const main = async () => {
   // detect_buffers uses Buffers to transfer data with dump/restore correctly
   const redis_options = { detect_buffers: true };
-  let source_client = redis.createClient(argv.source, redis_options);
+  let scan_client = redis.createClient(argv.source, redis_options);
+  let sync_client = redis.createClient(argv.source, redis_options);
   let destination_client = redis.createClient(argv.destination, redis_options);
 
   if (argv["replication-strategy"] == "monitor") {
-    start_monitor_sync();
+    start_monitor_sync(sync_client, destination_client);
   } else if (argv["replication-strategy"] == "notifications") {
-    start_notification_sync();
+    start_notification_sync(sync_client, destination_client);
   } else if (argv["replication-strategy"] == "none") {
     log("Not continuously syncing changes")
   }
@@ -71,13 +72,13 @@ const main = async () => {
 
   do {
     log(`scan start - iterator ${iterator}`);
-    let scan_result = await source_client.scanAsync(iterator);
+    let scan_result = await scan_client.scanAsync(iterator);
     iterator = scan_result[0];
     log(`scan keys  - ${scan_result[1]}`);
 
     for (let key of scan_result[1]) {
       // This returns the data structure of any key as binary data & the associated TTL in the same command
-      let multi_result = await source_client.multi().dump(new Buffer(key)).pttl(key).execAsync();
+      let multi_result = await scan_client.multi().dump(new Buffer(key)).pttl(key).execAsync();
       let object = multi_result[0];
       let expiry = multi_result[1] >= 0 ? multi_result[1] : 0;
       log(`fetched - key ${key}`);
@@ -88,10 +89,12 @@ const main = async () => {
     }
   } while (iterator != 0)
 
+  scan_client.quit();
+
   if (argv["replication-strategy"] != "none") {
     log(`initial sync complete, Ctrl-C to stop continuous sync`);
   } else {
-    log(`one-time sync complete`);
+    log(`one-time sync complete, Ctrl-C to disconnect`);
   }
 };
 
