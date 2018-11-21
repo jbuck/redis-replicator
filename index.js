@@ -53,20 +53,7 @@ const main = async () => {
   let source_client = redis.createClient(argv.source, redis_options);
   let destination_client = redis.createClient(argv.destination, redis_options);
 
-  // Listen for changes to the source redis via monitor command
-  source_client.on("monitor", async (time, args) => {
-    let command = args[0];
-    let commandArgs = args.slice(1);
-
-    // We only need to apply data modification commands to the destination redis
-    if (commandsToRun.includes(command)) {
-      log(`monitor recieved - ${args}`);
-      let result = await destination_client[command + "Async"](commandArgs);
-      log(`monitor applied  - ${result}`);
-    }
-  });
-
-  source_client.monitor();
+  start_monitor_sync();
 
   // Redis scan iterators start at 0, and end when it returns 0
   let iterator = 0;
@@ -90,7 +77,24 @@ const main = async () => {
     }
   } while (iterator != 0)
 
-  log(`initial sync complete, Ctrl-C to stop monitor sync`);
+  log(`initial sync complete, Ctrl-C to stop continuous sync`);
+};
+
+const start_monitor_sync = async (source_client, destination_client) => {
+  // Listen for changes to the source redis via monitor command
+  source_client.on("monitor", async (time, args) => {
+    let command = args[0];
+    let commandArgs = args.slice(1);
+
+    // We only need to apply data modification commands to the destination redis
+    if (commandsToRun.includes(command)) {
+      log(`monitor recieved - ${args}`);
+      let result = await destination_client[command + "Async"](commandArgs);
+      log(`monitor applied  - ${result}`);
+    }
+  });
+
+  source_client.monitor();
 };
 
 main()
