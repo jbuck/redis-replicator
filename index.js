@@ -115,7 +115,8 @@ const start_notification_sync = async (source_client, destination_client) => {
     let key = message;
 
     if (commandsToRun.includes(command)) {
-      log(`${command} ${key}`);
+      log(`notification recieved - ${command} ${key}`);
+      await copy_key(key, source_client, destination_client);
     }
   })
 
