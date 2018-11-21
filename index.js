@@ -77,15 +77,7 @@ const main = async () => {
     log(`scan keys  - ${scan_result[1]}`);
 
     for (let key of scan_result[1]) {
-      // This returns the data structure of any key as binary data & the associated TTL in the same command
-      let multi_result = await scan_client.multi().dump(new Buffer(key)).pttl(key).execAsync();
-      let object = multi_result[0];
-      let expiry = multi_result[1] >= 0 ? multi_result[1] : 0;
-      log(`fetched - key ${key}`);
-
-      // And this restores the data to the destination redis
-      let restore_result = await destination_client.restoreAsync(key, expiry, object, 'REPLACE');
-      log(`restore complete - ${restore_result.toString()}`);
+      await copy_key(key, scan_client, destination_client);
     }
   } while (iterator != 0)
 
@@ -119,10 +111,27 @@ const start_notification_sync = async (source_client, destination_client) => {
   // Listen for changes to the source redis via keyspace notifications
   // https://redis.io/topics/notifications
   source_client.on("pmessage", async (pattern, channel, message) => {
-    console.log(`${pattern},${channel},${message}`);
+    let command = channel.split(":")[1];
+    let key = message;
+
+    if (commandsToRun.includes(command)) {
+      log(`${command} ${key}`);
+    }
   })
 
   source_client.psubscribe("__keyevent@0__:*")
+}
+
+const copy_key = async (key, source_client, destination_client) => {
+  // This returns the data structure of any key as binary data & the associated TTL in the same command
+  let multi_result = await source_client.multi().dump(new Buffer(key)).pttl(key).execAsync();
+  let object = multi_result[0];
+  let expiry = multi_result[1] >= 0 ? multi_result[1] : 0;
+  log(`fetched - key ${key}`);
+
+  // And this restores the data to the destination redis
+  let restore_result = await destination_client.restoreAsync(key, expiry, object, 'REPLACE');
+  log(`restore complete - ${restore_result.toString()}`);
 }
 
 main()
