@@ -62,7 +62,7 @@ const main = async () => {
   if (argv["replication-strategy"] == "monitor") {
     start_monitor_sync(sync_client, destination_client);
   } else if (argv["replication-strategy"] == "notifications") {
-    start_notification_sync(sync_client, destination_client);
+    start_notification_sync(scan_client, sync_client, destination_client);
   } else if (argv["replication-strategy"] == "none") {
     log("Not continuously syncing changes")
   }
@@ -81,8 +81,6 @@ const main = async () => {
     }
   } while (iterator != 0)
 
-  scan_client.quit();
-
   if (argv["replication-strategy"] != "none") {
     log(`initial sync complete, Ctrl-C to stop continuous sync`);
   } else {
@@ -90,9 +88,9 @@ const main = async () => {
   }
 };
 
-const start_monitor_sync = async (source_client, destination_client) => {
+const start_monitor_sync = async (sync_client, destination_client) => {
   // Listen for changes to the source redis via monitor command
-  source_client.on("monitor", async (time, args) => {
+  sync_client.on("monitor", async (time, args) => {
     let command = args[0];
     let commandArgs = args.slice(1);
 
@@ -104,23 +102,23 @@ const start_monitor_sync = async (source_client, destination_client) => {
     }
   });
 
-  source_client.monitor();
+  sync_client.monitor();
 };
 
-const start_notification_sync = async (source_client, destination_client) => {
+const start_notification_sync = async (scan_client, sync_client, destination_client) => {
   // Listen for changes to the source redis via keyspace notifications
   // https://redis.io/topics/notifications
-  source_client.on("pmessage", async (pattern, channel, message) => {
+  sync_client.on("pmessage", async (pattern, channel, message) => {
     let command = channel.split(":")[1];
     let key = message;
 
     if (commandsToRun.includes(command)) {
       log(`notification recieved - ${command} ${key}`);
-      await copy_key(key, source_client, destination_client);
+      await copy_key(key, scan_client, destination_client);
     }
   })
 
-  source_client.psubscribe("__keyevent@0__:*")
+  sync_client.psubscribe("__keyevent@0__:*")
 }
 
 const copy_key = async (key, source_client, destination_client) => {
