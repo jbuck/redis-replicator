@@ -114,7 +114,13 @@ const start_notification_sync = async (scan_client, sync_client, destination_cli
 
     if (commandsToRun.includes(command)) {
       log(`notification recieved - ${command} ${key}`);
-      await copy_key(key, scan_client, destination_client);
+
+      if (command == "del") {
+        let result = await destination_client.delAsync(key);
+        log (`delete applied - ${result}`);
+      } else {
+        await copy_key(key, scan_client, destination_client);
+      }
     }
   })
 
