@@ -30,7 +30,8 @@ const commandsToRun = [
   "del",
   "expire",
   "hmset",
-  "hset"
+  "hset",
+  "setex",
 ];
 
 // This adds Promise-returning equivalent commands to the redis protoype for use with async/await
@@ -140,8 +141,3 @@ const copy_key = async (key, source_client, destination_client) => {
 }
 
 main()
-
-
-
-
-
