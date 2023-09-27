@@ -31,6 +31,7 @@ const commandsToRun = [
   "expire",
   "hmset",
   "hset",
+  "psetex",
   "set",
   "setex",
   "zadd",
