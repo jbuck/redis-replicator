@@ -29,11 +29,18 @@ const util = require("util");
 const commandsToRun = [
   "del",
   "expire",
+  "hdel",
   "hmset",
   "hset",
+  "pexpire",
+  "pexpireat",
   "psetex",
+  "sadd",
   "set",
   "setex",
+  // "spop", // This removes a random member of a set, I don't know how this could be replicated properly
+  "srem",
+  "unlink",
   "zadd",
   "zrem",
   "zremrangebyscore",
