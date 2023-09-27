@@ -31,7 +31,11 @@ const commandsToRun = [
   "expire",
   "hmset",
   "hset",
+  "set",
   "setex",
+  "zadd",
+  "zrem",
+  "zremrangebyscore",
 ];
 
 // This adds Promise-returning equivalent commands to the redis protoype for use with async/await
