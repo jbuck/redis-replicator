@@ -17,6 +17,11 @@ const argv = require("yargs")
       alias: "r",
       demandOption: true,
       describe: "Use MONITOR, keyspace notifications, or none to continuously replicate changes"
+    },
+    "scan-count": {
+      alias: "c",
+      default: 10,
+      describe: "SCAN COUNT parameter"
     }
   })
   .demandCommand(1, "You must specify a command")
@@ -25,7 +30,7 @@ const argv = require("yargs")
 const redis = require("redis");
 const util = require("util");
 
-// These are redis commands that send uses for inserting/updating/deleting/expiring data
+// These are redis commands for inserting/updating/deleting/expiring data
 const commandsToRun = [
   "del",
   "expire",
@@ -82,10 +87,11 @@ const main = async () => {
 
   // Redis scan iterators start at 0, and end when it returns 0
   let iterator = 0;
+  const scanCount = argv["scan-count"]
 
   do {
     log(`scan start - iterator ${iterator}`);
-    let scan_result = await scan_client.scanAsync(iterator);
+    let scan_result = await scan_client.scanAsync(iterator, 'COUNT', scanCount);
     iterator = scan_result[0];
     log(`scan keys  - ${scan_result[1]}`);
 
