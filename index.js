@@ -43,13 +43,16 @@ const commandsToRun = [
   "sadd",
   "set",
   "setex",
-  // "spop", // This removes a random member of a set, I don't know how this could be replicated properly
   "srem",
   "unlink",
   "zadd",
   "zrem",
   "zremrangebyscore",
 ];
+
+const commandsToCopyKey = [
+  "spop", // This removes random member(s) of a set, so copy the entire set instead of replaying this command
+]
 
 // This adds Promise-returning equivalent commands to the redis protoype for use with async/await
 commandsToRun.forEach((fnName) => {
@@ -118,6 +121,9 @@ const start_monitor_sync = async (sync_client, destination_client) => {
       log(`monitor recieved - ${args}`);
       let result = await destination_client[command + "Async"](commandArgs);
       log(`monitor applied  - ${result}`);
+    } else if (commandsToCopyKey.includes(command)) {
+      log(`monitor recieved - ${args}`);
+      await copy_key(commandArgs[0], scan_client, destination_client);
     }
   });
 
